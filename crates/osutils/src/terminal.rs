@@ -1,8 +1,15 @@
 use std::io::Read;
 use std::io::{stdout, Write};
-use termion::color::{Bg, Color, Fg, Reset};
-use termion::is_tty;
 
+#[cfg(not(windows))]
+use termion::color::{Bg, Color, Fg, Reset};
+
+#[cfg(windows)]
+pub fn terminal_size() -> std::io::Result<(u16, u16)> {
+    crossterm::terminal::size()
+}
+
+#[cfg(not(windows))]
 pub fn terminal_size() -> std::io::Result<(u16, u16)> {
     termion::terminal_size()
 }
@@ -10,17 +17,25 @@ pub fn terminal_size() -> std::io::Result<(u16, u16)> {
 pub fn has_ansi_colors() -> bool {
     #[cfg(windows)]
     {
-        return false;
-    }
-
-    if !is_tty(&stdout()) {
+        // Note: it is probably possible to implement colors with crossterm.
+        //
+        // To do so, create a subclass of TextUIOutputStream in breezy.ui.text,
+        // and use Colored::parse_ansi in crossterm::style to decode
+        // ANSI sequences into console commands.
+        // Or otherwise, re-design UI output to accept a sequence of commands
+        // instead of stream of bytes or strings.
         return false;
     }
 
     #[cfg(not(windows))]
     {
+        use termion::is_tty;
         use termion::color::DetectColors;
         use termion::raw::IntoRawMode;
+
+        if !is_tty(&stdout()) {
+            return false;
+        }
 
         match stdout().into_raw_mode() {
             Ok(mut term) => match term.available_colors() {
@@ -32,6 +47,7 @@ pub fn has_ansi_colors() -> bool {
     }
 }
 
+#[cfg(not(windows))]
 pub fn colorstring<F: Color, B: Color>(
     text: &[u8],
     fgcolor: Option<F>,

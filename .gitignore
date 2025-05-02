@@ -8,6 +8,7 @@ build/
 *_pyx.cpython-*.so
 *_c.cpython-*.so
 *_c.so
+*_pyx.*.pyd
 *_pyx.cpython-*.c
 *~
 /target

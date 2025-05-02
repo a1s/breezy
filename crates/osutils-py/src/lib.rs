@@ -15,8 +15,10 @@ use std::io::{BufRead, Read};
 use std::iter::Iterator;
 use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
-use termion::color::Color;
 use std::convert::TryInto;
+
+#[cfg(not(windows))]
+use termion::color::Color;
 
 create_exception!(
     breezy_osutils,
@@ -1134,6 +1136,7 @@ fn get_user_encoding() -> Option<String> {
     breezy_osutils::get_user_encoding()
 }
 
+#[cfg(not(windows))]
 fn string_to_color(name: &str) -> PyResult<&dyn Color> {
     match name {
         "darkblack" => Ok(&termion::color::Black),
