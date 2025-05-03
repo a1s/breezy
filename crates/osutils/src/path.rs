@@ -1,10 +1,13 @@
-use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashSet;
 use std::ffi::OsStr;
-use std::os::unix::fs::PermissionsExt;
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use unicode_normalization::{is_nfc, UnicodeNormalization};
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 pub fn is_inside(dir: &Path, fname: &Path) -> bool {
     fname.starts_with(dir)
@@ -49,15 +52,15 @@ pub fn minimum_path_selection(paths: HashSet<&Path>) -> HashSet<&Path> {
 #[cfg(target_os = "windows")]
 pub fn find_executable_on_path(name: &str) -> Option<String> {
     use std::env;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE};
+    use winreg::enums::HKEY_LOCAL_MACHINE;
     use winreg::RegKey;
+    let path = PathBuf::from(name);
     let exts = env::var("PATHEXT").unwrap_or_default();
     let exts = exts
         .split(';')
         .map(|ext| ext.to_lowercase())
         .collect::<Vec<_>>();
     let (name, exts) = {
-        let mut path = PathBuf::from(name);
         let ext = path
             .extension()
             .and_then(|ext| ext.to_str())
@@ -91,16 +94,19 @@ pub fn find_executable_on_path(name: &str) -> Option<String> {
             }
         }
     }
-    if let Ok(reg_key) = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths")
-    {
-        if let Ok(value) = reg_key.get_value(name) {
-            if let Some(value) = value.as_string() {
-                return Some(value);
+
+    let key = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths");
+    match key {
+        Ok(reg_key) => {
+            let value: std::io::Result<String> = reg_key.get_value(name);
+            match value {
+                Ok(path) => Some(path),
+                Err(_) => None,
             }
-        }
+        },
+        Err(_) => None,
     }
-    None
 }
 
 pub fn parent_directories(path: &Path) -> impl Iterator<Item = &Path> {
@@ -227,16 +233,27 @@ pub fn legal_path(_path: &Path) -> bool {
 }
 
 #[cfg(windows)]
-use lazy_static::lazy_static;
-#[cfg(windows)]
-lazy_static! {
-use regex::Regex;
-static ref VALID_WIN32_PATH_RE: Regex = Regex::new(r#"^([A-Za-z]:[/\\])?[^:<>*"?\|]*$"#).unwrap();
+fn valid_win32_path_re() -> &'static Regex {
+    static VALID_WIN32_PATH_RE: OnceLock<Regex> = OnceLock::new();
+    VALID_WIN32_PATH_RE.get_or_init(|| {
+        Regex::new(r#"^([A-Za-z]:[/\\])?[^:<>*"?\|]*$"#).unwrap()
+    })
 }
 
 #[cfg(windows)]
 pub fn legal_path(path: &Path) -> bool {
-    VALID_WIN32_PATH_RE.is_match(path)
+    let opstr = path.to_str();
+    match opstr {
+        Some(pstr) => valid_win32_path_re().is_match(pstr),
+        None => false
+    }
+}
+
+fn quote_re() -> &'static Regex {
+    static QUOTE_RE: OnceLock<Regex> = OnceLock::new();
+    QUOTE_RE.get_or_init(|| {
+        Regex::new(r#"([^a-zA-Z0-9.,:/\\_~-])"#).unwrap()
+    })
 }
 
 /// Return a quoted filename filename
@@ -244,11 +261,7 @@ pub fn legal_path(path: &Path) -> bool {
 /// This previously used backslash quoting, but that works poorly on
 /// Windows.
 pub fn quotefn(f: &str) -> String {
-    lazy_static! {
-        static ref QUOTE_RE: Regex = Regex::new(r#"([^a-zA-Z0-9.,:/\\_~-])"#).unwrap();
-    }
-
-    if QUOTE_RE.is_match(f) {
+    if quote_re().is_match(f) {
         format!(r#""{}""#, f)
     } else {
         f.to_string()
@@ -256,7 +269,6 @@ pub fn quotefn(f: &str) -> String {
 }
 
 pub mod win32 {
-    use lazy_static::lazy_static;
     use regex::Regex;
     use std::ffi::OsStr;
     use std::path::{Path, PathBuf};
@@ -292,7 +304,7 @@ pub mod win32 {
         }
     }
 
-    lazy_static! {
+    lazy_static::lazy_static! {
         static ref ABS_WINDOWS_PATH_RE: Regex = Regex::new(r#"^[A-Za-z]:[/\\]"#).unwrap();
     }
 
@@ -374,6 +386,7 @@ pub mod win32 {
 pub mod posix {
     use std::collections::HashMap;
     use std::ffi::OsStr;
+    use std::fs;
     use std::path::{Component, Path, PathBuf};
 
     pub fn abspath(path: &Path) -> Result<PathBuf, std::io::Error> {
@@ -425,11 +438,10 @@ pub mod posix {
     }
 
     pub fn realpath<P: AsRef<Path>>(filename: P) -> std::io::Result<PathBuf> {
-        let filename = filename.as_ref().to_path_buf();
-        let (path, _) = join_realpath(Path::new(""), &filename, &mut HashMap::new())?;
-        abspath(path.as_path())
+        fs::canonicalize(filename)
     }
 
+    /* join_realpath was used for realpath above, probably no longer needed
     fn join_realpath(
         path: &Path,
         rest: &Path,
@@ -491,6 +503,7 @@ pub mod posix {
 
         Ok((path.to_path_buf(), true))
     }
+    */
 
     pub fn pathjoin(ps: &[&OsStr]) -> PathBuf {
         let mut p = PathBuf::new();
@@ -566,23 +579,15 @@ pub fn normalizepath<P: AsRef<Path>>(f: P) -> std::io::Result<PathBuf> {
 
     // Broken filename
     if e.is_none() || e == Some(OsStr::new(".")) || e == Some(OsStr::new("..")) {
-        realpath(f.as_ref())
+        fs::canonicalize(f.as_ref())
     // Base and filename present
     } else if let Some(p) = p {
-        let p = realpath(p)?;
+        let p = fs::canonicalize(p)?;
         Ok(p.join(e.unwrap()))
     } else {
         // Just filename
         Ok(PathBuf::from(e.unwrap()))
     }
-}
-
-pub fn realpath(f: &Path) -> std::io::Result<PathBuf> {
-    #[cfg(windows)]
-    return win32::realpath(f);
-
-    #[cfg(not(windows))]
-    return posix::realpath(f);
 }
 
 #[derive(Debug)]
@@ -640,7 +645,7 @@ pub fn dereference_path(path: &Path) -> std::io::Result<PathBuf> {
         return Ok(PathBuf::from(path));
     };
     if let Some(parent) = path.parent() {
-        Ok(realpath(parent)?.join(filename))
+        Ok(fs::canonicalize(parent)?.join(filename))
     } else {
         Ok(PathBuf::from(filename))
     }

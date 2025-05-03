@@ -1,20 +1,21 @@
+use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::ffi::OsStringExt;
+use std::path::Path;
 use std::ptr;
 use winapi::shared::minwindef::DWORD;
-use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::fileapi::GetVolumeInformationW;
-use winapi::um::winnt::{LPWSTR, WCHAR};
 
 fn _get_fs_type(drive: &str) -> Option<String> {
     const MAX_FS_TYPE_LENGTH: DWORD = 16;
     let mut fs_type = vec![0u16; (MAX_FS_TYPE_LENGTH + 1) as usize];
     let res = unsafe {
         GetVolumeInformationW(
-            drive
-                .as_ref()
+            OsStr::new(drive)
                 .encode_wide()
                 .chain(std::iter::once(0))
-                .collect()
+                .collect::<Vec<u16>>()
                 .as_ptr(),
             ptr::null_mut(),
             0,
@@ -26,17 +27,16 @@ fn _get_fs_type(drive: &str) -> Option<String> {
         )
     };
     if res != 0 {
-        let fs_type_str = std::ffi::OsString::from_wide(&fs_type[..])
-            .to_str()
-            .unwrap_or_default();
-        Some(fs_type_str.to_owned())
+        let fs_type_str = OsString::from_wide(&fs_type[..]);
+        Some(String::from(fs_type_str.to_str().unwrap_or_default()))
     } else {
         None
     }
 }
 
 pub fn get_fs_type<P: AsRef<Path>>(path: P) -> Option<String> {
-    let drive = path.parent().and_then(|p| p.to_str()).unwrap_or_default();
+    let drive = path.as_ref().parent()
+        .and_then(|p| p.to_str()).unwrap_or_default();
     let drive = if drive.contains(':') {
         drive
     } else {
