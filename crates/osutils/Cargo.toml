@@ -23,13 +23,15 @@ path-clean = "1"
 dirs = "6"
 encoding_rs = ">=0.8"
 whoami = { workspace = true }
-nix = { workspace = true, features = ["fs"] }
 pyo3 = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 crossterm = "0.29.0"
+winapi = {version = "0.3.9", features = ["errhandlingapi"]}
+winreg = "0.55"
 
 [target.'cfg(not(windows))'.dependencies]
+nix = { workspace = true, features = ["fs"] }
 termion = ">=1"
 
 [target.'cfg(unix)'.dependencies]
