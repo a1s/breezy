@@ -196,6 +196,7 @@ dependencies = [
 name = "breezy-osutils"
 version = "3.4.0"
 dependencies = [
+ "bitflags",
  "chrono",
  "crossterm",
  "dirs",

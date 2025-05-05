@@ -1,3 +1,5 @@
+#[cfg(windows)]
+use crate::win32::SFlag;
 use core::ops::BitAnd;
 use log::debug;
 #[cfg(unix)]
@@ -169,7 +171,6 @@ pub fn copy_tree<P: AsRef<Path>, Q: AsRef<Path>>(from_path: P, to_path: Q) -> st
     Ok(())
 }
 
-#[cfg(unix)]
 const FORMATS: [(SFlag, &str); 7] = [
     (SFlag::S_IFDIR, "directory"),
     (SFlag::S_IFCHR, "chardev"),
@@ -180,7 +181,6 @@ const FORMATS: [(SFlag, &str); 7] = [
     (SFlag::S_IFSOCK, "socket"),
 ];
 
-#[cfg(unix)]
 pub fn kind_from_mode(mode: SFlag) -> &'static str {
     for (format_mode, format_kind) in FORMATS.iter() {
         if mode.bitand(SFlag::S_IFMT) == *format_mode {

@@ -397,6 +397,12 @@ pub mod textfile;
 pub mod time;
 
 #[cfg(unix)]
+pub use nix::libc::mode_t;
+
+#[cfg(windows)]
+pub type mode_t = u32;
+
+#[cfg(unix)]
 #[path = "mounts-unix.rs"]
 pub mod mounts;
 
@@ -433,3 +439,6 @@ pub fn get_user_name() -> String {
 
     whoami::username()
 }
+
+#[cfg(windows)]
+pub mod win32;
