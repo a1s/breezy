@@ -29,8 +29,8 @@ pub fn has_ansi_colors() -> bool {
 
     #[cfg(not(windows))]
     {
-        use termion::is_tty;
         use termion::color::DetectColors;
+        use termion::is_tty;
         use termion::raw::IntoRawMode;
 
         if !is_tty(&stdout()) {

@@ -104,7 +104,7 @@ pub fn find_executable_on_path(name: &str) -> Option<String> {
                 Ok(path) => Some(path),
                 Err(_) => None,
             }
-        },
+        }
         Err(_) => None,
     }
 }
@@ -235,9 +235,7 @@ pub fn legal_path(_path: &Path) -> bool {
 #[cfg(windows)]
 fn valid_win32_path_re() -> &'static Regex {
     static VALID_WIN32_PATH_RE: OnceLock<Regex> = OnceLock::new();
-    VALID_WIN32_PATH_RE.get_or_init(|| {
-        Regex::new(r#"^([A-Za-z]:[/\\])?[^:<>*"?\|]*$"#).unwrap()
-    })
+    VALID_WIN32_PATH_RE.get_or_init(|| Regex::new(r#"^([A-Za-z]:[/\\])?[^:<>*"?\|]*$"#).unwrap())
 }
 
 #[cfg(windows)]
@@ -245,15 +243,13 @@ pub fn legal_path(path: &Path) -> bool {
     let opstr = path.to_str();
     match opstr {
         Some(pstr) => valid_win32_path_re().is_match(pstr),
-        None => false
+        None => false,
     }
 }
 
 fn quote_re() -> &'static Regex {
     static QUOTE_RE: OnceLock<Regex> = OnceLock::new();
-    QUOTE_RE.get_or_init(|| {
-        Regex::new(r#"([^a-zA-Z0-9.,:/\\_~-])"#).unwrap()
-    })
+    QUOTE_RE.get_or_init(|| Regex::new(r#"([^a-zA-Z0-9.,:/\\_~-])"#).unwrap())
 }
 
 /// Return a quoted filename filename
