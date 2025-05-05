@@ -1,6 +1,10 @@
 use crate::filters::{ContentFilter, ContentFilterProvider, ContentFilterStack};
+use breezy_osutils::mode_t;
 use breezy_osutils::sha::sha_string;
+#[cfg(windows)]
+use breezy_osutils::win32::SFlag;
 use log::{debug, info};
+#[cfg(unix)]
 use nix::sys::stat::SFlag;
 use std::collections::HashMap;
 use std::fs;
@@ -8,7 +12,10 @@ use std::fs::{File, Metadata, Permissions};
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::NamedTempFile;
@@ -67,6 +74,7 @@ pub struct Fingerprint {
     pub mode: u32,
 }
 
+#[cfg(unix)]
 impl From<Metadata> for Fingerprint {
     fn from(meta: Metadata) -> Fingerprint {
         Fingerprint {
@@ -76,6 +84,37 @@ impl From<Metadata> for Fingerprint {
             ino: meta.ino(),
             dev: meta.dev(),
             mode: meta.mode(),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl From<Metadata> for Fingerprint {
+    fn from(meta: Metadata) -> Fingerprint {
+        Fingerprint {
+            size: meta.file_size(),
+            mtime: meta
+                .modified()
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
+            ctime: meta
+                .created()
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
+            /* XXX file_index() and volume_serial_number()
+             * may not be used on the stable release channel.
+             * As we don't have the file path here,
+             * we cannot get them from Windows API either.
+            ino: meta.file_index().unwrap_or(0) as u64,
+            dev: meta.volume_serial_number().unwrap_or(0) as u64,
+            */
+            ino: 0,
+            dev: 0,
+            mode: SFlag::from_metadata(&meta).bits(),
         }
     }
 }
@@ -203,7 +242,7 @@ impl HashCache {
         } else {
             self.miss_count += 1;
 
-            match SFlag::from_bits_truncate(file_fp.mode as nix::libc::mode_t) {
+            match SFlag::from_bits_truncate(file_fp.mode as mode_t) {
                 SFlag::S_IFREG => {
                     let filters: Box<dyn ContentFilter> =
                         if let Some(filter_provider) = self.filter_provider.as_ref() {

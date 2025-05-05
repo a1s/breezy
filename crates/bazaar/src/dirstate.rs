@@ -6,8 +6,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs::Metadata;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+
+use crate::hashcache::Fingerprint;
 
 pub trait SHA1Provider: Send + Sync {
     fn sha1(&self, path: &Path) -> std::io::Result<String>;
@@ -105,23 +108,14 @@ pub fn bisect_path_right(paths: &[&Path], path: &Path) -> usize {
 }
 
 pub fn pack_stat_metadata(metadata: &Metadata) -> String {
+    let fp = Fingerprint::from(metadata.clone());
     pack_stat(
-        metadata.len(),
-        metadata
-            .modified()
-            .unwrap()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-        metadata
-            .created()
-            .unwrap()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-        metadata.dev(),
-        metadata.ino(),
-        metadata.mode(),
+        fp.size,
+        fp.mtime as u64,
+        fp.ctime as u64,
+        fp.dev,
+        fp.ino,
+        fp.mode,
     )
 }
 
@@ -345,10 +339,7 @@ impl IdIndex {
         // the 'contains' check is O(N), since N is nicely bounded it shouldn't ever
         // cause quadratic failure.
         let file_id = entry_key.2;
-        let entry_keys = self
-            .id_index
-            .entry(file_id.clone())
-            .or_default();
+        let entry_keys = self.id_index.entry(file_id.clone()).or_default();
         entry_keys.push((entry_key.0.to_vec(), entry_key.1.to_vec(), file_id.clone()));
     }
 
