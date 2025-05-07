@@ -416,18 +416,28 @@ mod tests;
 pub mod terminal;
 
 #[cfg(unix)]
-pub fn is_local_pid_dead(pid: nix::unistd::Pid) -> bool {
+pub fn is_local_pid_dead(pid: i32) -> bool {
     use nix::sys::signal::kill;
+    let pp = nix::unistd::Pid::from_raw(pid);
 
-    match kill(pid, None) {
+    match kill(pp, None) {
         Ok(_) => false,                  // Process exists and is ours: not dead.
         Err(nix::Error::ESRCH) => true,  // Not found: as sure as we can be that it's dead.
         Err(nix::Error::EPERM) => false, // Exists, though not ours.
         Err(err) => {
-            debug!("kill({:?}, 0) failed: {}", pid, err);
+            debug!("kill({:?}, 0) failed: {}", pp, err);
             false // Don't really know.
         }
     }
+}
+
+#[cfg(windows)]
+pub fn is_local_pid_dead(pid: i32) -> bool {
+    use sysinfo::{Pid, System};
+
+    let mut sys = System::new();
+    let pp = Pid::from(pid as usize);
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pp]), true) == 0
 }
 
 pub fn get_user_name() -> String {
