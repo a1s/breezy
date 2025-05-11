@@ -54,6 +54,12 @@ encoding = "0.2.33"
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true, features = ["fs"] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version="0.59.0", features=[
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
+
 [workspace.dependencies]
 nix = ">=0.26"
 pyo3 = "=0.24"

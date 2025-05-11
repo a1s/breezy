@@ -2,6 +2,7 @@ use log::info;
 use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::io::{self, Write};
+use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -101,11 +102,7 @@ pub fn open_brz_log() -> Option<File> {
     };
 
     // Write a header to the log file if it is empty.
-    if brz_log_file
-        .metadata()
-        .ok()
-        .is_some_and(|md| md.len() == 0)
-    {
+    if brz_log_file.metadata().ok().is_some_and(|md| md.len() == 0) {
         if let Err(e) = writeln!(
             brz_log_file,
             "this is a debug log for diagnosing/reporting problems in brz"
@@ -293,4 +290,47 @@ pub fn debug_memory_proc(message: &str, short: bool) {
             }
         }
     }
+}
+
+#[cfg(windows)]
+pub fn debug_memory_proc(message: &str, short: bool) {
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::System::ProcessStatus::{
+        GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+
+    let cb: u32 = size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+    let mut pmc: PROCESS_MEMORY_COUNTERS = PROCESS_MEMORY_COUNTERS {
+        cb: cb,
+        PageFaultCount: 0,
+        PeakWorkingSetSize: 0,
+        WorkingSetSize: 0,
+        QuotaPeakPagedPoolUsage: 0,
+        QuotaPagedPoolUsage: 0,
+        QuotaPeakNonPagedPoolUsage: 0,
+        QuotaNonPagedPoolUsage: 0,
+        PagefileUsage: 0,
+        PeakPagefileUsage: 0,
+    };
+    let ph: HANDLE = unsafe { GetCurrentProcess() };
+    if 0 < unsafe { GetProcessMemoryInfo(ph, &mut pmc, cb) } {
+        if !message.is_empty() {
+            info!("{}", message);
+        }
+        info!("WorkingSetSize: {}", pmc.WorkingSetSize);
+        info!("PagefileUsage: {}", pmc.PagefileUsage);
+        info!("PeakWorkingSetSize: {}", pmc.PeakWorkingSetSize);
+        info!("PeakPagefileUsage: {}", pmc.PeakPagefileUsage);
+        if !short {
+            info!("PageFaultCount: {}", pmc.PageFaultCount);
+            info!("QuotaPagedPoolUsage: {}", pmc.QuotaPagedPoolUsage);
+            info!("QuotaNonPagedPoolUsage: {}", pmc.QuotaNonPagedPoolUsage);
+            info!("QuotaPeakPagedPoolUsage: {}", pmc.QuotaPeakPagedPoolUsage);
+            info!(
+                "QuotaPeakNonPagedPoolUsage: {}",
+                pmc.QuotaPeakNonPagedPoolUsage,
+            );
+        }
+    };
 }
