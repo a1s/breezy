@@ -1,12 +1,10 @@
 use bitflags::bitflags;
-use std::ffi::OsString;
 use std::fs::Metadata;
 use std::io::{Error, ErrorKind, Result};
-use std::os::windows::ffi::OsStringExt;
 use std::os::windows::fs::MetadataExt;
 use windows_sys::Win32::Storage::FileSystem;
-use winreg::RegKey;
 use winreg::enums::HKEY_CURRENT_USER;
+use winreg::RegKey;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -46,6 +44,9 @@ pub fn current_user_email() -> Result<String> {
         .open_subkey("Software\\Microsoft\\IdentityCRL\\UserExtendedProperties")?;
     match key.enum_keys().next() {
         Some(item) => item,
-        None => Err(Error::new(ErrorKind::Other, "Cannot find email for current user")),
+        None => Err(Error::new(
+            ErrorKind::Other,
+            "Cannot find email for current user",
+        )),
     }
 }

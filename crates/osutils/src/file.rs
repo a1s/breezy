@@ -88,10 +88,7 @@ pub fn copy_ownership_from_path<P: AsRef<Path>>(dst: P, src: Option<&Path>) -> R
 }
 
 #[cfg(windows)]
-pub fn copy_ownership_from_path<P: AsRef<Path>>(
-    dst: P,
-    src: Option<&Path>,
-) -> Result<()> {
+pub fn copy_ownership_from_path<P: AsRef<Path>>(dst: P, src: Option<&Path>) -> Result<()> {
     debug!(
         "Copying ownership from \"{}\" to \"{}\" is not implemented. \
            You may want to set it manually.",

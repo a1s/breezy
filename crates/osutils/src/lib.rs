@@ -408,6 +408,7 @@ pub mod time;
 pub use nix::libc::mode_t;
 
 #[cfg(windows)]
+#[allow(non_camel_case_types)]
 pub type mode_t = u32;
 
 #[cfg(unix)]
