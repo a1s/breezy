@@ -126,7 +126,7 @@ pub fn _config_dir() -> std::io::Result<(PathBuf, ConfigDirKind)> {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Unable to determine AppData location",
-            ))
+            ));
         }
     }
     let base = base.unwrap_or_else(|| {
@@ -360,5 +360,16 @@ pub fn get_default_mail_domain(mailname_file: Option<&Path>) -> Option<String> {
         }
     } else {
         None
+    }
+}
+
+#[cfg(windows)]
+pub fn get_default_mail_domain(_: Option<&Path>) -> Option<String> {
+    match breezy_osutils::win32::current_user_email() {
+        Ok(email) => match email.rsplit_once("@") {
+            Some((_, domain)) => Some(String::from(domain)),
+            None => None,
+        },
+        Err(_) => None,
     }
 }
