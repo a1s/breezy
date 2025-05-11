@@ -50,28 +50,26 @@ pub fn bazaar_config_dir() -> std::io::Result<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        match base {
+        let base_path = match base {
             None => {
-                let appdata = win32utils::get_appdata_location().ok();
-                let home = win32utils::get_home_location().ok();
-                let mut base_path = match appdata {
+                let appdata = breezy_osutils::get_config_dir();
+                match appdata {
                     Some(path) => path,
-                    None => match home {
-                        Some(path) => path,
-                        None => "".to_string(),
-                    },
-                };
-                base_path.push_str(r"\bazaar\2.0");
-                return base_path;
+                    None => {
+                        let home = breezy_osutils::get_home_dir();
+                        match home {
+                            Some(path) => path,
+                            None => PathBuf::new(),
+                        }
+                    }
+                }
             }
-            Some(base_path) => {
-                let mut path = base_path;
-                path.push_str(r"\bazaar\2.0");
-                return path;
-            }
-        }
+            Some(path) => path,
+        };
+        Ok(base_path.as_path().join("bazaar/2.0"))
     }
 
+    #[cfg(not(target_os = "windows"))]
     match base {
         None => {
             let xdg_dir = env::var("XDG_CONFIG_HOME").map_or_else(
@@ -118,12 +116,17 @@ impl ToString for ConfigDirKind {
 /// the bazaar one (see bazaar_config_dir()) does, use that instead.
 pub fn _config_dir() -> std::io::Result<(PathBuf, ConfigDirKind)> {
     // TODO: Global option --config-dir to override this.
-    let base = env::var("BRZ_HOME").map(PathBuf::from).ok();
+    let mut base = env::var("BRZ_HOME").map(PathBuf::from).ok();
     #[cfg(windows)]
     {
-        let base = base.or_else(win32utils::get_appdata_location);
         if base.is_none() {
-            return Err("Unable to determine AppData location".into());
+            base = breezy_osutils::get_config_dir();
+        };
+        if base.is_none() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Unable to determine AppData location",
+            ))
         }
     }
     let base = base.unwrap_or_else(|| {
@@ -195,7 +198,7 @@ pub fn crash_dir() -> PathBuf {
 
     #[cfg(windows)]
     {
-        config_dir().join("Crash")
+        config_dir().unwrap().join("Crash")
     }
 
     #[cfg(not(windows))]
@@ -214,12 +217,12 @@ pub fn cache_dir() -> std::io::Result<PathBuf> {
 
     #[cfg(windows)]
     {
-        let mut base: Option<PathBuf> = env::var("BRZ_HOME").ok().map(PathBuf::from);
+        base = env::var("BRZ_HOME").ok().map(PathBuf::from);
         if base.is_none() {
-            base = win32utils::get_local_appdata_location();
+            base = breezy_osutils::get_local_data_dir();
         }
         if base.is_none() {
-            base = win32utils::get_home_location();
+            base = breezy_osutils::get_home_dir();
         }
     }
 
@@ -325,6 +328,15 @@ pub fn auto_user_id() -> std::io::Result<(Option<String>, Option<String>)> {
     let email = Some(format!("{}@{}", username, default_mail_domain));
 
     Ok((realname, email))
+}
+
+#[cfg(windows)]
+pub fn auto_user_id() -> std::io::Result<(Option<String>, Option<String>)> {
+    let email = match breezy_osutils::win32::current_user_email() {
+        Ok(name) => Some(name),
+        Err(_) => None,
+    };
+    Ok((None, email))
 }
 
 /// If possible, return the assumed default email domain.

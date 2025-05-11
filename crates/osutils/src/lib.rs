@@ -356,6 +356,14 @@ pub fn get_home_dir() -> Option<std::path::PathBuf> {
     dirs::home_dir()
 }
 
+pub fn get_config_dir() -> Option<std::path::PathBuf> {
+    dirs::config_dir()
+}
+
+pub fn get_local_data_dir() -> Option<std::path::PathBuf> {
+    dirs::data_local_dir()
+}
+
 #[cfg(windows)]
 fn _get_user_encoding() -> Option<String> {
     Some(String::from("utf-8"))
