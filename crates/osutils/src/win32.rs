@@ -1,7 +1,9 @@
 use bitflags::bitflags;
+use std::ffi::OsString;
 use std::fs::Metadata;
+use std::os::windows::ffi::OsStringExt;
 use std::os::windows::fs::MetadataExt;
-use winapi::um::winnt::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_READONLY};
+use windows_sys::Win32::Storage::FileSystem;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -22,12 +24,12 @@ impl SFlag {
         let attr = metadata.file_attributes();
         // From Python2 posixmodule.c
         let mut mm: u32 = 0;
-        if (attr & FILE_ATTRIBUTE_DIRECTORY) > 0 {
+        if (attr & FileSystem::FILE_ATTRIBUTE_DIRECTORY) > 0 {
             mm |= SFlag::S_IFDIR.bits() | 0111; // Execute permissions
         } else {
             mm |= SFlag::S_IFREG.bits();
         };
-        if (attr & FILE_ATTRIBUTE_READONLY) > 0 {
+        if (attr & FileSystem::FILE_ATTRIBUTE_READONLY) > 0 {
             mm |= 0444;
         } else {
             mm |= 0666;

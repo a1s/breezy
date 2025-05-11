@@ -218,7 +218,7 @@ dependencies = [
  "unicode-normalization",
  "walkdir",
  "whoami",
- "winapi",
+ "windows-sys 0.59.0",
  "winreg",
 ]
 

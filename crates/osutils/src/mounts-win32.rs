@@ -4,11 +4,10 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
 use std::ptr;
-use winapi::shared::minwindef::DWORD;
-use winapi::um::fileapi::GetVolumeInformationW;
+use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationW;
 
 fn _get_fs_type(drive: &str) -> Option<String> {
-    const MAX_FS_TYPE_LENGTH: DWORD = 16;
+    const MAX_FS_TYPE_LENGTH: u32 = 16;
     let mut fs_type = vec![0u16; (MAX_FS_TYPE_LENGTH + 1) as usize];
     let res = unsafe {
         GetVolumeInformationW(
